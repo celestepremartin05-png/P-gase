@@ -1246,25 +1246,29 @@ function hm1(h){if(!/^\d\d:\d\d$/.test(h||""))return "";const m=Math.min(23*60+5
 function typesOf(d){const a=(d.types&&d.types.length?d.types:(d.type?[d.type]:[])).filter(t=>TYPES[t]);return a}
 function defSum(L){return L.reduce((a,t)=>a+num(defPrice(t)),0)||""}
 function defPrice(t){if(!t)return "";if(t==="visite"){const v=(S.offresDb.visite||{}).prixBase;if(num(v))return num(v);const f=((S.offresDb.experiences||{}).formules||[]).find(x=>/visite/i.test(x.nom||""));return f?num(f.prix):250}return num((S.offresDb[t]||{}).prixBase)||""}
-function prixField(){const d=draft;const L=typesOf(d);const dp=defSum(L);return fld("Prix (DH)"+(L.length>1?' <small class="muted">('+L.map(t=>num(defPrice(t))?money(num(defPrice(t))).replace(/<[^>]+>/g,""):"").filter(Boolean).join(" + ")+')</small>':""),inp("f_montant",d.montant,"number",dp?String(dp):"Ex. 1300"))}
+function prixField(){const d=draft;const L=typesOf(d);const dp=defSum(L);return fld("Prix provisoire (DH)"+(L.length>1?' <small class="muted">('+L.map(t=>num(defPrice(t))?money(num(defPrice(t))).replace(/<[^>]+>/g,""):"").filter(Boolean).join(" + ")+')</small>':""),inp("f_montant",d.montant,"number",dp?String(dp):"Ex. 1300"))}
 function payCalc(){const d=draft,b=d.besoin;const prix=num(d.montant),recu=b.recu===""||b.recu===undefined?null:num(b.recu);
   if(recu===null||!prix)return "";const diff=recu-prix;
   if(diff===0)return '<div class="paycalc ok">✓ Tout est payé</div>';
   if(diff<0)return '<div class="paycalc due">Reste <b>'+money(-diff)+'</b> à payer</div>';
   const tr=b.trop||"";return '<div class="paycalc over"><span><b>'+money(diff)+'</b> en trop</span><span class="seg">'+[["rendu","Rendu au client"],["avoir","À déduire de la prochaine séance"]].map(([v,l])=>'<button type="button" data-trop="'+v+'" aria-pressed="'+(tr===v)+'">'+l+'</button>').join("")+'</span></div>'}
-function demandeFields(){const d=draft,b=d.besoin;const L=typesOf(d);
-  if(!L.length)return '<p class="muted" style="margin:0;font-size:14px">Touchez une ou plusieurs demandes ci-dessus pour voir les questions.</p>';
+const COURS_T=["cours-adultes","cours-enfants"],FORM_T=["stages","formation-en-ligne"],AVEC_T=["visite"];
+function demandeFields(){const L=typesOf(draft);
+  if(!L.length)return '<p class="muted" style="margin:0;font-size:14px">Touchez une bulle pour choisir la demande.</p>';
   let h='';
-  if(L.includes("visite")){const enf=b.enfant||"";
-    h+='<div class="dblock"><span class="dtitle">🏠 Visite</span><div class="grid">'+fld("Jour de la visite",inp("v_date",d.dateEvent,"date"))+fld("Heure",inp("v_heure",b.heure||"","time"))+'</div>'+
-      '<div class="row" style="margin:4px 0"><span style="font-weight:600">Vient avec un enfant ?</span><span class="seg">'+[["oui","Oui"],["non","Non"]].map(([v,l])=>'<button type="button" data-enf="'+v+'" aria-pressed="'+(enf===v)+'">'+l+'</button>').join("")+'</span></div>'+
-      (enf==="oui"?'<div class="grid">'+fld("Nom du tuteur",inp("v_tuteur",b.tuteur||"","text","Parent ou accompagnant"))+fld("Prénom de l\'enfant",inp("v_enfant",b.enfantNom||"","text"))+fld("Âge de l\'enfant",inp("v_age",b.enfantAge||"","number"))+'</div>':"")+
-      '<p class="muted" style="margin:6px 0 0;font-size:13px">La visite s\'ajoute toute seule dans le calendrier, au jour et à l\'heure choisis.</p></div>'}
-  const others=L.filter(t=>t!=="visite");
-  if(others.length){h+='<div class="dblock">'+(L.length>1?'<span class="dtitle">'+esc(others.map(t=>TYPES[t].label).join(" + "))+'</span>':"")+'<div class="grid">'+(L.includes("visite")?"":fld("Date souhaitée",inp("f_date",d.dateEvent,"date")))+fld("Nombre de personnes",inp("f_pers",d.personnes,"number"))+[...new Set(others.map(pmode))].map(m=>besoinFields(others.find(t=>pmode(t)===m))).join("")+'</div></div>'}
-  h+='<div class="dblock pay"><span class="dtitle">💳 Prix et paiement</span><div class="grid">'+prixField()+fld("Reçu (DH)",inp("f_recu",b.recu??"","number","Ce que le client a donné"))+'</div><div id="payCalc">'+payCalc()+'</div>'+
-    (num(d.avoir)?'<div class="paycalc avoir">Avoir de <b>'+money(num(d.avoir))+'</b> à déduire de la prochaine séance <button type="button" class="btn small" data-avoir-use>Avoir utilisé</button></div>':"")+'</div>';
+  if(L.some(t=>COURS_T.includes(t)))h+='<div class="dblock"><span class="dtitle">❓ Questions à poser · Cours</span><div class="grid">'+besoinFields("cours-adultes")+'</div></div>';
+  if(L.some(t=>FORM_T.includes(t)))h+='<div class="dblock"><span class="dtitle">🎯 Script de closing · Formation</span><p class="muted" style="margin:0;font-size:14px">Le script de closing sera ajouté ici.</p></div>';
   return h}
+function avecFields(){const d=draft,b=d.besoin,enf=b.enfant||"";
+  return '<div class="grid">'+fld("Jour de la visite",inp("v_date",d.dateEvent,"date"))+fld("Heure",inp("v_heure",b.heure||"","time"))+fld("Qui vient avec ?",inp("v_avec",b.avec||"","text","Ex. son mari et deux amies"))+fld("Nombre de personnes",inp("f_pers",d.personnes,"number"))+'</div>'+
+    '<div class="row" style="margin:4px 0"><span style="font-weight:600">Vient avec un enfant ?</span><span class="seg">'+[["oui","Oui"],["non","Non"]].map(([v,l])=>'<button type="button" data-enf="'+v+'" aria-pressed="'+(enf===v)+'">'+l+'</button>').join("")+'</span></div>'+
+    (enf==="oui"?'<div class="grid">'+fld("Nom du tuteur",inp("v_tuteur",b.tuteur||"","text","Parent ou accompagnant"))+fld("Prénom de l\'enfant",inp("v_enfant",b.enfantNom||"","text"))+fld("Âge de l\'enfant",inp("v_age",b.enfantAge||"","number"))+'</div>':"")+
+    '<p class="muted" style="margin:6px 0 0;font-size:13px">La visite s\'ajoute toute seule dans le calendrier, au jour et à l\'heure choisis.</p>'}
+function isPaid(d){const b=d.besoin||{};if(b.recu===""||b.recu===undefined)return b.paye==="oui";return num(d.montant)>0&&num(b.recu)>=num(d.montant)}
+function prixFields(){const d=draft,paid=isPaid(d);
+  return '<div class="grid">'+prixField()+'<label class="check" style="align-self:end;font-weight:700;font-size:16px"><input type="checkbox" id="f_paye"'+(paid?" checked":"")+'> Payé</label></div>'+
+    (paid?'<div class="paycalc ok">✓ Payé</div>':'<div class="paycalc due">En attente de paiement</div>')+
+    (num(d.avoir)?'<div class="paycalc avoir">Avoir de <b>'+money(num(d.avoir))+'</b> à déduire de la prochaine séance <button type="button" class="btn small" data-avoir-use>Avoir utilisé</button></div>':"")}
 function drawFiche(){
   const d=draft,isNew=S.open==="new";splitNom(d);const tel=d.telephone||"";
   const old=document.querySelector("#drawerRoot .drawer");const keep=old?old.scrollTop:0;
@@ -1279,12 +1283,17 @@ function drawFiche(){
   let h='<div class="overlay" id="ov"><div class="drawer" role="dialog" aria-modal="true" aria-labelledby="fTitle">'+
   '<div class="dh"><div style="min-width:0;flex:1"><h3 style="margin:0">'+(isNew?"Nouveau prospect":"Fiche prospect")+'</h3><h2 id="fTitle">'+esc(d.nom||"Sans nom")+'</h2></div><button class="btn ghost" id="fClose" aria-label="Fermer">✕</button></div>'+convert+
   (tel&&!isNew?'<div class="row"><span style="font-size:20px;font-weight:700;user-select:all;font-variant-numeric:tabular-nums">'+esc(tel)+'</span><button class="btn small" data-copy="'+esc(tel)+'">Copier</button>'+waBtn(tel,"Bonjour "+String(d.prenom||d.nom||"").split(" ")[0]+", c'est "+reg().domaine+". Je reviens vers vous suite à votre demande. ")+'</div>':"")+
-  '<fieldset class="fs"><legend>Contact</legend><div class="row" style="margin-bottom:6px"><span style="font-weight:600">C\'est une agence ?</span><span class="seg">'+[["oui","Oui"],["non","Non"]].map(([v,l])=>'<button type="button" data-agence="'+v+'" aria-pressed="'+((d.estAgence?"oui":"non")===v)+'">'+l+'</button>').join("")+'</span></div><div class="grid">'+(d.estAgence?fld("Nom de l\'agence",inp("f_agence",d.agence||"","text","Ex. Agence mariage Marrakech"),true)+'<p class="muted" style="margin:0;font-size:13px;grid-column:1/-1">La personne que vous avez au téléphone :</p>':"")+fld("Prénom",inp("f_prenom",d.prenom,"text"))+fld("Nom",inp("f_nomf",d.nomFam,"text"))+fld("Téléphone",inp("f_tel",d.telephone,"tel","06…"))+fld("E-mail",inp("f_email",d.email||"","email","nom@exemple.com"))+fld("Venu par",sel("f_source",SOURCES,d.source))+'</div></fieldset>'+
-  '<fieldset class="fs"><legend>La demande</legend><div class="typepick">'+Object.entries(TYPES).map(([k,v])=>'<button type="button" data-ptype="'+k+'" aria-pressed="'+typesOf(d).includes(k)+'">'+(k==="visite"?"🏠 ":"")+v.label+'</button>').join("")+'</div>'+demandeFields()+
-  fld("Informations",'<textarea id="f_notes" placeholder="Tout ce qui est utile : ce qu\'il cherche, ses questions, son budget…">'+esc(d.notes)+'</textarea>',true)+'</fieldset>'+
-  '<details class="fs suivi" id="suiviBox"'+(S.suiviOpen?" open":"")+'><summary><span>Suivi et relances'+(isVis?' <small class="muted">(facultatif)</small>':"")+'</span><span class="chip st-'+d.statut+'">'+STATUTS[d.statut].label+'</span></summary>'+
+  (()=>{let n=0;const L=typesOf(d);const lg=t=>'<legend>'+(++n)+' · '+t+'</legend>';
+  let x='<fieldset class="fs">'+lg("Contact")+'<div class="grid">'+fld("Prénom",inp("f_prenom",d.prenom,"text"))+fld("Nom",inp("f_nomf",d.nomFam,"text"))+fld("Téléphone",inp("f_tel",d.telephone,"tel","06…"))+fld("E-mail",inp("f_email",d.email||"","email","nom@exemple.com"))+'</div>'+
+  '<details class="more-c"'+(d.estAgence?" open":"")+'><summary class="muted" style="cursor:pointer;font-size:13px;font-weight:600">Agence, venu par…</summary><div class="row" style="margin:8px 0 6px"><span style="font-weight:600">C\'est une agence ?</span><span class="seg">'+[["oui","Oui"],["non","Non"]].map(([v,l])=>'<button type="button" data-agence="'+v+'" aria-pressed="'+((d.estAgence?"oui":"non")===v)+'">'+l+'</button>').join("")+'</span></div><div class="grid">'+(d.estAgence?fld("Nom de l\'agence",inp("f_agence",d.agence||"","text","Ex. Agence mariage Marrakech"),true):"")+fld("Venu par",sel("f_source",SOURCES,d.source))+'</div></details></fieldset>';
+  x+='<fieldset class="fs">'+lg("La demande")+'<div class="typepick">'+Object.entries(TYPES).map(([k,v])=>'<button type="button" data-ptype="'+k+'" aria-pressed="'+L.includes(k)+'">'+(k==="visite"?"🏠 ":"")+v.label+'</button>').join("")+'</div>'+demandeFields()+
+  fld("Informations",'<textarea id="f_notes" placeholder="Tout ce qui est utile : ce qu\'il cherche, ses questions, son budget…">'+esc(d.notes)+'</textarea>',true)+'</fieldset>';
+  if(L.some(t=>AVEC_T.includes(t)))x+='<fieldset class="fs">'+lg("Qui vient avec")+avecFields()+'</fieldset>';
+  if(L.length)x+='<fieldset class="fs">'+lg("Prix provisoire")+prixFields()+'</fieldset>';
+  x+='<fieldset class="fs">'+lg("Prochaine étape")+(isVis?'<p class="muted" style="margin:0;font-size:14px">La prochaine étape est la visite, au jour et à l\'heure indiqués plus haut.</p>':'<div class="grid">'+fld("Prochaine action",sel("f_atype",Object.entries(ACTIONS),d.prochaine.type||"appel"))+fld("Quand",inp("f_adate",d.prochaine.date||"","date"))+'</div><div class="quick"><button type="button" class="btn small" data-q="0">Aujourd\'hui</button><button type="button" class="btn small" data-q="1">Demain</button><button type="button" class="btn small" data-q="3">Dans 3 jours</button><button type="button" class="btn small" data-q="7">Dans 1 semaine</button><button type="button" class="btn small ghost" data-q="x">Aucune</button></div>'+fld("Détail de l\'action",inp("f_atxt",d.prochaine.texte||"","text","Ex. envoyer le devis"),true))+'</fieldset>';
+  return x})()+
+  '<details class="fs suivi" id="suiviBox"'+(S.suiviOpen||d.__call?" open":"")+'><summary><span>Appels, statut et historique</span><span class="chip st-'+d.statut+'">'+STATUTS[d.statut].label+'</span></summary>'+
   callBox()+'<div class="grid">'+fld("Statut",sel("f_statut",Object.entries(STATUTS).map(([k,v])=>[k,v.label]),d.statut))+(d.statut==="perdu"?fld("Raison de la perte",sel("f_perte",PERTES,d.raisonPerte,"Choisir…")):"<span></span>")+'</div>'+
-  (isVis?"":'<div class="grid">'+fld("Prochaine action",sel("f_atype",Object.entries(ACTIONS),d.prochaine.type||"appel"))+fld("Quand",inp("f_adate",d.prochaine.date||"","date"))+'</div><div class="quick"><button type="button" class="btn small" data-q="0">Aujourd\'hui</button><button type="button" class="btn small" data-q="1">Demain</button><button type="button" class="btn small" data-q="3">Dans 3 jours</button><button type="button" class="btn small" data-q="7">Dans 1 semaine</button><button type="button" class="btn small ghost" data-q="x">Aucune</button></div>'+fld("Détail de l\'action",inp("f_atxt",d.prochaine.texte||"","text","Ex. envoyer le devis"),true))+
   fld("Ajouter un échange",'<textarea id="f_log" placeholder="Ex. Appelée, attend l\'accord de son mari."></textarea>',true)+
   (d.historique.length?'<ul class="hist">'+d.historique.slice().reverse().map(x=>'<li><time>'+fmtLong(x.date)+'</time>'+esc(x.texte)+'</li>').join("")+'</ul>':"")+'</details>'+
   '<div class="row"><button class="btn primary" id="fSave">Enregistrer</button><button class="btn" id="fCancel">Annuler</button><span class="spacer"></span>'+(!isNew?(S.confirmDel?'<span class="muted" style="font-size:13px">Supprimer définitivement ?</span><button class="btn small danger" id="fDelYes">Oui, supprimer</button><button class="btn small" id="fDelNo">Non</button>':'<button class="btn small danger" id="fDel">Supprimer</button>'):"")+'</div></div></div>';
@@ -1309,7 +1318,7 @@ function readForm(){
   d.dateEvent=g("v_date",g("f_date",d.dateEvent));d.personnes=g("f_pers",d.personnes);d.montant=g("f_montant",d.montant);d.statut=g("f_statut",d.statut);if(v("f_perte")!==undefined)d.raisonPerte=v("f_perte");
   if(v("f_atype")!==undefined)d.prochaine={type:v("f_atype"),date:v("f_adate"),texte:String(v("f_atxt")||"").trim()};
   d.notes=g("f_notes",d.notes);const cd=document.getElementById("c_done");if(cd)d.__call=cd.checked;
-  [["v_heure","heure"],["v_tuteur","tuteur"],["v_enfant","enfantNom"],["v_age","enfantAge"]].forEach(([id,k])=>{const x=v(id);if(x!==undefined)d.besoin[k]=x});const vr=v("f_recu");if(vr!==undefined)d.besoin.recu=vr;
+  [["v_heure","heure"],["v_avec","avec"],["v_tuteur","tuteur"],["v_enfant","enfantNom"],["v_age","enfantAge"]].forEach(([id,k])=>{const x=v(id);if(x!==undefined)d.besoin[k]=x});const vr=v("f_recu");if(vr!==undefined)d.besoin.recu=vr;const fp=document.getElementById("f_paye");if(fp){d.paye=fp.checked;d.besoin.recu=fp.checked?(d.montant||d.besoin.recu||""):""}
   ["b_sous","b_traiteur","b_spectacle","b_horaire","b_detail","b_enfants","b_occasion","b_niveau","b_age","b_formule","b_dispo","b_quelle","b_objectif"].forEach(k=>{const x=v(k);if(x!==undefined){if(k==="b_sous")d.sousType=x;else d.besoin[k.slice(2)]=x}});
   const log=v("f_log");if(log&&log.trim())d.__log=log.trim();
 }
@@ -1330,7 +1339,7 @@ async function saveProspect(){
   if(recuN!==null&&recuN>prixN&&d.besoin.trop==="avoir")d.avoir=recuN-prixN;else if(d.besoin.trop==="rendu")d.avoir=0;
   d.besoin.paye=recuN!==null&&prixN&&recuN>=prixN?"oui":"non";
   if(TL.includes("visite")&&d.dateEvent){const hr=d.besoin.heure||"";d.prochaine={type:"rdv",date:d.dateEvent,texte:"Visite du domaine"+(hr?" à "+hr.replace(":","h"):"")};
-    const eid=d.eventId||("visite-"+id);const b=d.besoin;const info=[b.enfant==="oui"?"Avec un enfant : "+[b.enfantNom,b.enfantAge?b.enfantAge+" ans":""].filter(Boolean).join(", ")+(b.tuteur?" · tuteur : "+b.tuteur:""):"",d.notes||""].filter(Boolean).join("\n");
+    const eid=d.eventId||("visite-"+id);const b=d.besoin;const info=[b.avec?"Vient avec : "+b.avec:"",b.enfant==="oui"?"Avec un enfant : "+[b.enfantNom,b.enfantAge?b.enfantAge+" ans":""].filter(Boolean).join(", ")+(b.tuteur?" · tuteur : "+b.tuteur:""):"",d.notes||""].filter(Boolean).join("\n");
     const ev={...(S.agenda[eid]||blankEvent(d.dateEvent,"rdv")),offre:"visite",kind:"rdv",typeLibre:"Visite",titre:"Visite"+(TL.length>1?" + "+TL.filter(x=>x!=="visite").map(x=>TYPES[x].label).join(" + "):"")+" · "+(d.nom||"Prospect"),date:d.dateEvent,debut:hr,fin:hm1(hr),statut:"confirme",client:{nom:d.nom,tel:d.telephone,email:d.email||""},prospectId:id,notes:info,paiement:{total:prixN||"",acompte:recuN!==null&&recuN<prixN?recuN:"",acompteRecu:recuN!==null&&recuN>0&&recuN<prixN,soldeRecu:recuN!==null&&prixN>0&&recuN>=prixN},updatedAt:new Date().toISOString()};
     if(await write("agenda/"+eid,ev)){S.agenda[eid]=ev;d.eventId=eid}}
   const pub={nom:d.nom,agence:d.estAgence?(d.agence||""):"",type:d.type,types:TL,col:(S.pub[id]&&S.pub[id].statut===d.statut&&S.pub[id].col)||"",avoir:num(d.avoir)||0,sousType:d.sousType||"",statut:d.statut,dateEvent:d.dateEvent||"",personnes:d.personnes?Number(d.personnes):"",montant:d.montant?Number(d.montant):"",source:d.source,raisonPerte:d.statut==="perdu"?(d.raisonPerte||""):"",paye:d.statut==="reserve"&&!!d.paye,createdAt:(S.pub[id]&&S.pub[id].createdAt)||new Date().toISOString(),updatedAt:new Date().toISOString(),exemple:!!d.exemple,eventId:d.eventId||""};
@@ -1371,7 +1380,7 @@ document.addEventListener("click",async e=>{
     const d=draft;const r=await saveProspect();if(!r)return;closeFiche();
     S.tab="clients";S.ctab="eleves";S.route={page:"eleve",id:null};S.draft={nom:d.nom,tel:d.telephone,parent:"",niveau:d.besoin.niveau||"",age:d.besoin.age||"",actif:true,creneaux:[{jour:3,heure:"17:00"}],paiements:[],seances:[],notes:d.notes||"",prixCours:""};S.dirty=true;render();window.scrollTo(0,0);return}
 });
-document.addEventListener("change",e=>{if(S.open&&(e.target.id==="f_statut"||e.target.id==="c_done")){readForm();drawFiche()}});
+document.addEventListener("change",e=>{if(S.open&&(e.target.id==="f_statut"||e.target.id==="c_done"||e.target.id==="f_paye")){readForm();drawFiche()}});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"&&S.open)closeFiche()});
 
 /* ================= v2 : types unifiés (11 offres + rendez-vous, appel, autre) ================= */
